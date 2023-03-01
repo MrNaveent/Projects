@@ -1,0 +1,1191 @@
+---
+title: "Tiwari Naveen Assignment_1"
+author: "Tiwari Naveen"
+date: "2023-01-09"
+output: html_document
+---
+
+
+## PREVIEW
+
+- This document is related to the `first assignment` from the subject `Data Processing in R and Python`. It Contains the codes for each queries, which includes compare the codes with the asked SQL query, using the `compare method`. This report also includes a `microbenchmark test` comparing the runtime of the functions.
+
+- This report includes three "R" queries based on the following SQL query, using base functions, dplyr library and data.table library. 
+
+
+- Including the required libraries and csv files:
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(stringsAsFactors = FALSE)
+library(sqldf)
+library(dplyr)
+library(data.table)
+library(compare)
+Posts = read.csv("/Users/naveen/Downloads/Posts.csv")
+Comments = read.csv("/Users/naveen/Downloads/Comments.csv")
+Badges = read.csv("/Users/naveen/Downloads/Badges.csv")
+Users = read.csv("/Users/naveen/Downloads/Users.csv")
+Votes =  read.csv("/Users/naveen/Downloads/Votes.csv")
+```
+
+
+
+## First query
+
+**SQL query:**
+```
+sqlFiltered <- function(Posts) {
+  sql <- sqldf("SELECT STRFTIME('%Y', CreationDate) AS Year, COUNT(*) AS TotalNumber FROM Posts
+GROUP BY Year")
+}
+```
+
+**Base functions:**
+```
+baseFiltered <- function(Posts) {
+ Year <- strftime(Posts$CreationDate, format="%Y")
+ result = as.data.frame(table(Year))
+ colnames(result)[2] <- c( "TotalNumber")
+ result
+}
+compare(sqlFiltered(Posts), baseFiltered(Posts), allowAll = T)
+```
+- Query explanation:
+
+The `SQL query` asked to select just the `Year part` of the "CreationDate column" from the `Posts` csv file, and count the number of occurrence of each Year.
+
+So I used the `strftime function` to get the appropriate date format, and renamed the  number of occurrence column as `TotalNumber`.
+
+
+Running `compare` function yields:
+```{r}
+sqlFiltered <- function(Posts) {
+  sql <- sqldf("SELECT STRFTIME('%Y', CreationDate) AS Year, COUNT(*) AS TotalNumber FROM Posts
+GROUP BY Year")
+}
+
+baseFiltered <- function(Posts) {
+ Year <- strftime(Posts$CreationDate, format="%Y")
+ result = as.data.frame(table(Year))
+ colnames(result)[2] <- c( "TotalNumber")
+ result
+}
+compare(sqlFiltered(Posts), baseFiltered(Posts), allowAll = T)
+```
+
+**dplyr:**
+```
+dplyrFiltered <- function(Posts) {
+  result <- Posts %>%
+  mutate(Year = strftime(CreationDate, format = "%Y"))  %>%
+  add_count(., Year) %>%
+  select(., 'Year', 'n') %>%
+  distinct(.,Year, .keep_all=T) %>%
+  rename(., 'Year'='Year','TotalNumber'='n')
+result
+}
+compare(sqlFiltered(Posts), dplyrFiltered(Posts), allowAll = T)
+```
+
+- Query explanation:
+
+I have used the `%>%` pipe operator, as it helps in connecting the codes.
+Using the `mutate and strftime function` to get the appropriate date format, and used the `add_count function` to get the number of occurrence each "Year".
+At last I renamed it as `TotalNumber`.
+
+
+Running `compare` function yields:
+```{r}
+sqlFiltered <- function(Posts) {
+  sql <- sqldf("SELECT STRFTIME('%Y', CreationDate) AS Year, COUNT(*) AS TotalNumber FROM Posts
+GROUP BY Year")
+}
+
+dplyrFiltered <- function(Posts) {
+  result <- Posts %>%
+  mutate(Year = strftime(CreationDate, format = "%Y"))  %>%
+  add_count(., Year) %>%
+  select(., 'Year', 'n') %>%
+  distinct(.,Year, .keep_all=T) %>%
+  rename(., 'Year'='Year','TotalNumber'='n')
+  result
+}
+compare(sqlFiltered(Posts), dplyrFiltered(Posts), allowAll = T)
+
+```
+
+**data.table:**
+```
+datatableFiltered <- function(Posts) {
+  Posts_dt <- as.data.table(Posts)
+  postsTable <- Posts_dt[, Year := strftime(CreationDate, format   = "%Y")] 
+  result = postsTable[,.(TotalNumber=( count=.N)),by=Year]
+  result
+}
+compare(sqlFiltered(Posts), datatableFiltered(Posts), allowAll = T)
+
+```
+
+- Query explanation:
+
+Using the `strftime function` to get the appropriate date format, and used the `( count=.N)` to get the number of occurrence each `Year as TotalNumber`.
+
+
+Running `compare` function yields:
+```{r}
+sqlFiltered <- function(Posts) {
+  sql <- sqldf("SELECT STRFTIME('%Y', CreationDate) AS Year, COUNT(*) AS TotalNumber FROM Posts
+GROUP BY Year")
+}
+
+datatableFiltered <- function(Posts) {
+  Posts_dt <- as.data.table(Posts)
+  postsTable <- Posts_dt[, Year := strftime(CreationDate, format   = "%Y")] 
+  result = postsTable[,.(TotalNumber=( count=.N)),by=Year]
+  result
+}
+compare(sqlFiltered(Posts), datatableFiltered(Posts), allowAll = T)
+
+```
+
+Running `microbenchmark` yields:
+
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=sqlFiltered(Posts),
+  base=baseFiltered(Posts),
+  dplyr=dplyrFiltered(Posts),
+  data.table=datatableFiltered(Posts),
+  times = 5
+)
+```
+ From the output of `microbenchmark` we can see that base is the fastest.
+
+## Second query
+
+**SQL query:**
+```
+sqlFiltered <- function(Posts, Users) {
+  sql <- sqldf("SELECT Id, DisplayName, SUM(ViewCount) AS TotalViews FROM Users
+  JOIN (
+  SELECT OwnerUserId, ViewCount FROM Posts WHERE PostTypeId = 1 ) AS Questions
+  ON Users.Id = Questions.OwnerUserId GROUP BY Id
+  ORDER BY TotalViews DESC
+  LIMIT 10")
+}
+```
+
+**Base functions:**
+```
+baseFiltered <- function(Posts, Users) {
+ Questions = Posts[Posts$PostTypeId >=1 ,c("ViewCount", "OwnerUserId")]
+ TotalViews <- aggregate(Questions$ViewCount, by = Questions['OwnerUserId'], sum, na.rm = TRUE)
+ UsersId <- unique(Users[ , c("Id", "DisplayName")])
+ res <- merge(UsersId, TotalViews, by.x = 'Id', by.y = 'OwnerUserId')
+ colnames(res)[2:3] <- c("DisplayName",'TotalViews')
+ res[order(res$TotalViews, decreasing = TRUE), ][1:10, ]
+
+}
+compare(sqlFiltered(Posts, Users), baseFiltered(Posts, Users), allowAll = T)
+
+```
+
+- Query explanation:
+
+In the SQL query it was asked to select some columns from the `Posts and Users` csv file and then, rename it and perform some operations.After that we have to `inner join` them. Then we have to order it by "TotalViews" column by `decreasing, with a limit of 10`.
+
+I use the `dollar operator` to select the data only when `PosTtypeId = 1` from the "Posts csv file", and other columns as "Questions". Then I used the `aggregate function`, to get the `sum of column ViewCount as TotalViews`.
+
+After that performed it's `inner join` with of Users csv file Id's part, using the `merge function`. After that did some renaming and then we ordered the data of  `TotalViews` as decreasing with the `limit of 10`. Using the `order function`.
+
+
+
+Running `compare` function yields:
+```{r}
+sqlFiltered <- function(Posts, Users) {
+  sql <- sqldf("SELECT Id, DisplayName, SUM(ViewCount) AS TotalViews FROM Users
+JOIN (
+SELECT OwnerUserId, ViewCount FROM Posts WHERE PostTypeId = 1 ) AS Questions
+ON Users.Id = Questions.OwnerUserId GROUP BY Id
+ORDER BY TotalViews DESC
+LIMIT 10")
+}
+
+baseFiltered <- function(Posts, Users) {
+  Questions = Posts[Posts$PostTypeId >=1 ,c("ViewCount", "OwnerUserId")]
+  TotalViews <- aggregate(Questions$ViewCount, by = Questions['OwnerUserId'], sum, na.rm = TRUE)
+  UsersId <- unique(Users[ , c("Id", "DisplayName")])
+  res <- merge(UsersId, TotalViews, by.x = 'Id', by.y = 'OwnerUserId')
+  colnames(res)[2:3] <- c("DisplayName",'TotalViews')
+  res[order(res$TotalViews, decreasing = TRUE), ][1:10, ]
+
+}
+compare(sqlFiltered(Posts, Users), baseFiltered(Posts, Users), allowAll = T)
+
+
+```
+
+**dplyr:**
+```
+dplyrFiltered <- function(Posts, Users) {
+ Questions <- Posts %>%
+  filter(PostTypeId == 1) %>% 
+  select(., OwnerUserId,ViewCount) %>% 
+  group_by(OwnerUserId)%>%
+  summarise(TotalViews=sum(ViewCount),
+            .groups = 'drop')
+  
+result <- Users %>%
+  select(., 'Id','DisplayName') %>%
+  inner_join(.,Questions , by=c( "Id"="OwnerUserId")) %>%
+  group_by(Id)%>%
+  arrange(., desc(TotalViews))
+y=as.data.frame(result[1:10,])
+result
+}
+compare(sqlFiltered(Posts, Users), dplyrFiltered(Posts, Users), allowAll = T)
+
+```
+- Query explanation:
+
+I used the `filter function` values only when `PosTtypeId = 1` from the "Posts csv file". After that I selected the required columns and then by using `group_by fuction and summarized function`, I grouped them by `OwnerUserId column` and counted the "TotalViews from the ViewCount column" from the Posts csv file.
+
+Then I selected the required columns from the "Users csv file", and after that I `inner joined` them and then grouped them by "Id". Afterwards I arranged the TotalViews column as decreasing using `arrange function`, with the limit of 10.
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Posts, Users) {
+  sql <- sqldf("SELECT Id, DisplayName, SUM(ViewCount) AS TotalViews FROM Users
+JOIN (
+SELECT OwnerUserId, ViewCount FROM Posts WHERE PostTypeId = 1 ) AS Questions
+ON Users.Id = Questions.OwnerUserId GROUP BY Id
+ORDER BY TotalViews DESC
+LIMIT 10")
+}
+
+dplyrFiltered <- function(Posts, Users) {
+ Questions <- Posts %>%
+  filter(PostTypeId == 1) %>% 
+  select(., OwnerUserId,ViewCount) %>% 
+  group_by(OwnerUserId)%>%
+  summarise(TotalViews=sum(ViewCount),
+            .groups = 'drop')
+  
+result <- Users %>%
+  select(., Id,DisplayName) %>%
+  inner_join(.,Questions , by=c( "Id"="OwnerUserId")) %>%
+  group_by(Id)%>%
+  arrange(., desc(TotalViews))
+y=as.data.frame(result[1:10,])
+result
+}
+compare(sqlFiltered(Posts, Users), dplyrFiltered(Posts, Users), allowAll = T)
+
+
+```
+
+**data.table:**
+```
+datatableFiltered <- function(Posts,Users) {
+
+ Questions<- as.data.table( Posts[Posts$PostTypeId >=1, c("ViewCount", "OwnerUserId")])
+ k <- Users[, c("Id", "DisplayName")]
+ usersTable <- data.table(k)
+ result <- usersTable[Questions, on=c('Id'='OwnerUserId'),nomatch=0] 
+ colnames(result)[3] <- 'TotalViews'
+ result
+ result <- result[order(-TotalViews)]
+ result <- result[1:10]
+ as.data.frame(result)
+}
+compare(sqlFiltered(Posts,Users), datatableFiltered(Posts,Users), allowAll = T)
+
+```
+
+- Query explanation
+
+I selected the required column the required filter as `Questions by using data. table` and after that, did the `inner join"` with "userTable". Then renamed the 3rd column of output as TotalViews, and then I arranged it decreasing using the `order function` with a limit of 10.
+
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Posts,Users) {
+sql <- sqldf("SELECT Id, DisplayName, SUM(ViewCount) AS TotalViews FROM Users
+JOIN (
+SELECT OwnerUserId, ViewCount FROM Posts WHERE PostTypeId = 1 ) AS Questions
+ON Users.Id = Questions.OwnerUserId GROUP BY Id
+ORDER BY TotalViews DESC
+LIMIT 10")
+}
+
+datatableFiltered <- function(Posts,Users) {
+
+ Questions<- as.data.table( Posts[Posts$PostTypeId ==1, c("ViewCount", "OwnerUserId")])
+ k <- Users[, c("Id", "DisplayName")]
+ usersTable <- data.table(k)
+ result <- usersTable[Questions, on=c('Id'='OwnerUserId'),nomatch=0] 
+ colnames(result)[3] <- 'TotalViews'
+ result
+ result <- result[order(-TotalViews)]
+ result <- result[1:10]
+ as.data.frame(result)
+}
+compare(sqlFiltered(Posts,Users), datatableFiltered(Posts,Users), allowAll = T)
+
+```
+
+Running `microbenchmark` yields:
+
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=sqlFiltered(Posts, Users),
+  base=baseFiltered(Posts, Users),
+  dplyr=dplyrFiltered(Posts, Users),
+  data.table=datatableFiltered(Posts, Users),
+  times = 5
+)
+```
+
+From the output of `microbenchmark` we can see that data.table is the fastest.
+
+## Third query
+
+**SQL query:**
+```
+sqlFiltered <- function(Badges) {
+  sql <- sqldf("SELECT Year, Name, MAX((Count * 1.0) / CountTotal) AS MaxPercentage 
+FROM (
+SELECT BadgesNames.Year, BadgesNames.Name, BadgesNames.Count, BadgesYearly.CountTotal 
+FROM (
+SELECT Name, COUNT(*) AS Count, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY Name, Year
+) AS BadgesNames 
+JOIN (
+SELECT COUNT(*) AS CountTotal, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY YEAR
+) AS BadgesYearly
+
+ON BadgesNames.Year = BadgesYearly.Year )
+GROUP BY Year")
+}
+
+```
+
+
+**Base functions:**
+```
+baseFiltered <- function(Badges) {
+
+ Badges$Date <- substring(Badges$Date, 1, 4)
+ BadgesNames <- aggregate(Badges['Name'], by = Badges[c('Name', 'Date')], length)
+ colnames(BadgesNames)[2:3] <- c("Year", "Count")
+ 
+ Badges$Date <- substring(Badges$Date, 1, 4)
+ BadgesYearly <- aggregate(Badges['Date'], by = Badges[c('Date')], length)
+ colnames(BadgesYearly) <- c("Year", "CountTotal") 
+ 
+ z = merge( x= BadgesNames,y = BadgesYearly,by.x ='Year', by.y = 'Year', all.x = F, all.y = F)
+ z=mutate(z, MaxPercentage = (z$Count)/z$CountTotal)
+ z <- unique(merge(aggregate(MaxPercentage ~ Year, max, data = z), z))
+ 
+ result <- z[, c("Year","Name" ,"MaxPercentage")]
+ result
+
+}
+compare(sqlFiltered(Badges), baseFiltered(Badges), allowAll = T)
+
+
+```
+- Query explanation
+
+For `BadgesNames`
+I used the `substring function` to get the required date format from `column Date of badges csv file`.After that I did the count using the `aggregate function` and did the renaming of the Date column as Year and the count part as Count. The same I did for `BadgesYearly` part, but here we just had to select count as CountTotal and Year.
+
+Then I did the `inner join` of `BadgesNames` and `BadgesYearly` by `Year`. After that I divided the Count and CountTotal column, and calculated the Max part using the `unique aggregate function` and after that did the renaming to get the desired results.
+
+
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Badges) {
+  sql <- sqldf("SELECT Year, Name, MAX((Count * 1.0) / CountTotal) AS MaxPercentage 
+FROM (
+SELECT BadgesNames.Year, BadgesNames.Name, BadgesNames.Count, BadgesYearly.CountTotal 
+FROM (
+SELECT Name, COUNT(*) AS Count, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY Name, Year
+) AS BadgesNames 
+JOIN (
+SELECT COUNT(*) AS CountTotal, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY YEAR
+) AS BadgesYearly
+
+ON BadgesNames.Year = BadgesYearly.Year )
+GROUP BY Year")
+}
+
+baseFiltered <- function(Badges) {
+
+ Badges$Date <- substring(Badges$Date, 1, 4)
+BadgesNames <- aggregate(Badges['Name'], by = Badges[c('Name', 'Date')], length)
+colnames(BadgesNames)[2:3] <- c("Year", "Count")
+
+Badges$Date <- substring(Badges$Date, 1, 4)
+BadgesYearly <- aggregate(Badges['Date'], by = Badges[c('Date')], length)
+colnames(BadgesYearly) <- c("Year", "CountTotal") 
+
+z = merge( x= BadgesNames,y = BadgesYearly,by.x ='Year', by.y = 'Year', all.x = F, all.y = F)
+z=mutate(z, MaxPercentage = (z$Count)/z$CountTotal)
+z <- unique(merge(aggregate(MaxPercentage ~ Year, max, data = z), z))
+
+result <- z[, c("Year","Name" ,"MaxPercentage")]
+result
+
+}
+compare(sqlFiltered(Badges), baseFiltered(Badges), allowAll = T)
+
+
+```
+
+**dplyr:**
+```
+dplyrFiltered <- function(Badges) {
+BadgesNames <- Badges %>%
+  mutate(., Year = strftime(Date, format = "%Y")) %>%
+  select(., Name, Year) %>%
+  add_count(., Name, name="Count") %>%
+  group_by(Name,Year) %>% 
+  summarize(Count=n())
+  
+BadgesYearly <- Badges %>%
+  mutate(., Year = strftime(Date, format = "%Y")) %>%
+  select(.,Year) %>%
+  add_count(., Year,name="CountTotal") %>%  
+  group_by(Year) %>% 
+  summarize(CountTotal=n()) %>%
+  inner_join(., BadgesNames, by=c("Year")) %>%
+  group_by(Year)
+  
+result=mutate(BadgesYearly, MaxPercentage = Count/CountTotal) 
+result %>% group_by(Year) %>% 
+  filter(MaxPercentage == max(MaxPercentage)) %>%
+  select(.,Year, Name,MaxPercentage)
+ 
+}
+compare(sqlFiltered(Badges), dplyrFiltered(Badges), allowAll = T)
+
+
+```
+
+- Query explanation:
+
+For `BadgesNames` part I used `mutate and strftime` to get the required date format. Then by using the `add_count function`, I got the Count for Year, after that I grouped it by name and Year using `group_by function`.
+
+For `BadgesYearly` part I use the same functions to get the date part, and after that used the `add_count function` to get the count of year as `CountTotal` and then I grouped it by Year using `group_by function` and after that I did the `inner join` on `BadgesNames`and `BadgesYearly` by Year.
+
+By the `mutate function` to got the division of Count and CountTotal as `MaxPercentage`.After that I filtered the MaxPercentage using `max filter` function, and then selected the required output.
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Badges) {
+  sql <- sqldf("SELECT Year, Name, MAX((Count * 1.0) / CountTotal) AS MaxPercentage 
+FROM (
+SELECT BadgesNames.Year, BadgesNames.Name, BadgesNames.Count, BadgesYearly.CountTotal 
+FROM (
+SELECT Name, COUNT(*) AS Count, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY Name, Year
+) AS BadgesNames 
+JOIN (
+SELECT COUNT(*) AS CountTotal, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY YEAR
+) AS BadgesYearly
+
+ON BadgesNames.Year = BadgesYearly.Year )
+GROUP BY Year")
+}
+
+dplyrFiltered <- function(Badges) {
+BadgesNames <- Badges %>%
+  mutate(., Year = strftime(Date, format = "%Y")) %>%
+  select(., Name, Year) %>%
+  add_count(., Name, name="Count") %>%
+  group_by(Name,Year) %>% 
+  summarize(Count=n())
+
+BadgesYearly <- Badges %>%
+  mutate(., Year = strftime(Date, format = "%Y")) %>%
+  select(.,Year) %>%
+  add_count(., Year,name="CountTotal") %>%  
+  group_by(Year) %>% 
+  summarize(CountTotal=n()) %>%
+  inner_join(., BadgesNames, by=c("Year")) %>%
+  group_by(Year)
+
+result=mutate(BadgesYearly, MaxPercentage = Count/CountTotal) 
+result %>% group_by(Year) %>% 
+  filter(MaxPercentage == max(MaxPercentage)) %>%
+  select(.,Year, Name,MaxPercentage)
+}
+compare(sqlFiltered(Badges), dplyrFiltered(Badges), allowAll = T)
+
+
+```
+
+**data.table:**
+```
+datatableFiltered <- function(Badges) {
+o <- as.data.table(Badges)
+o <- o[, Year := strftime(Date, format = "%Y")] 
+BadgesNames = o[,.(Count=(count=.N)),by=c("Year","Name")]
+
+po <- as.data.table(Badges)
+po <- po[, Year := strftime(Date, format = "%Y")] 
+BadgesYearly = po[,.( CountTotal = (count=.N)),by=Year]
+
+Q <- na.omit(BadgesNames[BadgesYearly ,on=c( "Year")])
+Q <- Q[,':='(MaxPercentage=Count/CountTotal)]
+Q <- Q[Q[, .I[MaxPercentage==max(MaxPercentage)],by =Year]$V1]
+
+result <- Q[, c("Year","Name", "MaxPercentage")]
+result
+}
+compare(sqlFiltered(Badges), datatableFiltered(Badges), allowAll = T)
+
+```
+ - Query explanation:
+
+For`BadgesNames` I used the `strftime` to get the required date format from the Date column of the `Badges` csv file and then used the `(count=.N)` count the Year part as Count.
+
+I did the same for `BadgesYearly` using the same functions, and then using `na. omit`, I  `ineer joined` `BadgesNames` and `BadgesYearly` by Year.
+After that I divided the both  counted parts to get the `MaxPercentage`
+by using `, .I[MaxPercentage==max(MaxPercentage)],by =Year]$V1]` to get the maximum of MaxPercentage.
+
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Badges) {
+  sql <- sqldf("SELECT Year, Name, MAX((Count * 1.0) / CountTotal) AS MaxPercentage 
+FROM (
+SELECT BadgesNames.Year, BadgesNames.Name, BadgesNames.Count, BadgesYearly.CountTotal 
+FROM (
+SELECT Name, COUNT(*) AS Count, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY Name, Year
+) AS BadgesNames 
+JOIN (
+SELECT COUNT(*) AS CountTotal, STRFTIME('%Y', Badges.Date) AS Year FROM Badges
+GROUP BY YEAR
+) AS BadgesYearly
+
+ON BadgesNames.Year = BadgesYearly.Year )
+GROUP BY Year")
+}
+
+datatableFiltered <- function(Badges) {
+o <- as.data.table(Badges)
+o <- o[, Year := strftime(Date, format = "%Y")] 
+BadgesNames = o[,.(Count=(count=.N)),by=c("Year","Name")]
+
+po <- as.data.table(Badges)
+po <- po[, Year := strftime(Date, format = "%Y")] 
+BadgesYearly = po[,.( CountTotal = (count=.N)),by=Year]
+
+Q <- na.omit(BadgesNames[BadgesYearly ,on=c( "Year")])
+Q <- Q[,':='(MaxPercentage=Count/CountTotal)]
+Q <- Q[Q[, .I[MaxPercentage==max(MaxPercentage)],by =Year]$V1]
+
+result <- Q[, c("Year","Name", "MaxPercentage")]
+result
+}
+compare(sqlFiltered(Badges), datatableFiltered(Badges), allowAll = T)
+
+
+```
+
+
+
+Running `microbenchmark` yields:
+
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=sqlFiltered(Badges),
+  base=baseFiltered(Badges),
+  dplyr=dplyrFiltered(Badges),
+  data.table=datatableFiltered(Badges),
+  times = 5
+)
+```
+
+From the output of `microbenchmark` we can see that base is the fastest.
+
+
+## Fourth query
+
+**SQL query:**
+```
+sqlFiltered <- function(Comments, Posts) {
+  sql <- sqldf("SELECT Title, CommentCount, ViewCount, CommentsTotalScore, DisplayName, Reputation, Location FROM (
+SELECT Posts.OwnerUserId, Posts.Title, Posts.CommentCount, Posts.ViewCount, CmtTotScr.CommentsTotalScore
+FROM (
+SELECT PostId, SUM(Score) AS CommentsTotalScore FROM Comments
+GROUP BY PostId
+) AS CmtTotScr
+JOIN Posts ON Posts.Id = CmtTotScr.PostId WHERE Posts.PostTypeId=1
+) AS PostsBestComments
+JOIN Users ON PostsBestComments.OwnerUserId = Users.Id ORDER BY CommentsTotalScore DESC
+LIMIT 10")
+}
+```
+
+
+
+**Base functions:**
+```
+baseFiltered <- function(Comments, Posts) {
+ CmtToScr <- aggregate(Comments$Score, by = Comments['PostId'],sum)
+colnames(CmtToScr)[2] <- "CommentsTotalScore"
+PostsBestComments  <- merge( x = Posts[Posts$PostTypeId==1, ] ,y = CmtToScr,by.x ='Id', by.y = 'PostId',all.x = F, all.y = F)
+a <- PostsBestComments[ , c('CommentsTotalScore', 'OwnerUserId','Title','CommentCount','ViewCount') ] 
+
+result<- merge( x= PostsBestComments ,y = Users,by.x ='OwnerUserId', by.y = 'Id' ,all.x = F, all.y = F)
+result<- head(result[ order(result$CommentsTotalScore, decreasing = c(TRUE)), ],10)
+result <- result[, c('Title', 'CommentCount', 'ViewCount','CommentsTotalScore', 'DisplayName', 'Reputation' , 'Location')]
+
+}
+compare(sqlFiltered(Comments, Posts), baseFiltered(Comments, Posts), allowAll = T)
+```
+
+ - Query explanation:
+ 
+I used the `aggregate function` to get the `sum` of the "Score column" from the `Comments`csv file. After that I renamed it as "CommentsTotalScore" using `colname function`, and then I joined it using the `merge function` with "PostId" from the `Comments` csv file, with the filter of `PostTypeId = 1`.
+
+After that I selected the required columns and again did the "inner joint" using the `merge function`.
+Then by using the `order function` to filter the data of`CommentTotalScore` in "decreasing order" with the limit of 10.  
+Atlast I selected the required columns for the output.
+
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Comments, Posts,Users) {
+  sql <- sqldf("SELECT Title, CommentCount, ViewCount, CommentsTotalScore, DisplayName, Reputation, Location FROM (
+SELECT Posts.OwnerUserId, Posts.Title, Posts.CommentCount, Posts.ViewCount, CmtTotScr.CommentsTotalScore
+FROM (
+SELECT PostId, SUM(Score) AS CommentsTotalScore FROM Comments
+GROUP BY PostId
+) AS CmtTotScr
+JOIN Posts ON Posts.Id = CmtTotScr.PostId WHERE Posts.PostTypeId=1
+) AS PostsBestComments
+JOIN Users ON PostsBestComments.OwnerUserId = Users.Id ORDER BY CommentsTotalScore DESC
+LIMIT 10")
+}
+
+baseFiltered <- function(Comments, Posts,Users) {
+ CmtToScr <- aggregate(Comments$Score, by = Comments['PostId'],sum)
+colnames(CmtToScr)[2] <- "CommentsTotalScore"
+PostsBestComments  <- merge( x = Posts[Posts$PostTypeId==1, ] ,y = CmtToScr,by.x ='Id', by.y = 'PostId',all.x = F, all.y = F)
+a <- PostsBestComments[ , c('CommentsTotalScore', 'OwnerUserId','Title','CommentCount','ViewCount') ] 
+
+result<- merge( x= PostsBestComments ,y = Users,by.x ='OwnerUserId', by.y = 'Id' ,all.x = F, all.y = F)
+result<- head(result[ order(result$CommentsTotalScore, decreasing = c(TRUE)), ],10)
+result <- result[, c('Title', 'CommentCount', 'ViewCount','CommentsTotalScore', 'DisplayName', 'Reputation' , 'Location')]
+
+}
+compare(sqlFiltered(Comments, Posts,Users), baseFiltered(Comments, Posts,Users), allowAll = T)
+
+
+```
+
+**dplyr:**
+```
+
+dplyrFiltered <- function(Comments, Posts) {
+ po <- Posts %>%
+  filter(., PostTypeId == 1)
+
+CmtToScr  = Comments %>%
+  group_by(PostId) %>%
+  summarise(CommentsTotalScore = sum(Score),
+            .groups = 'drop') %>%
+  inner_join(., po, by=c("PostId"="Id")) 
+
+PostsBestComments = as.data.frame(CmtToScr)
+head(PostsBestComments )
+result <- PostsBestComments[ , c('CommentsTotalScore', 'OwnerUserId','Title','CommentCount','ViewCount') ] %>%
+  inner_join(., Users, by=c("OwnerUserId"="Id")) %>%
+  arrange(., desc(CommentsTotalScore)) %>%
+  slice(1:10) %>%
+  select(., 'Title', 'CommentCount', 'ViewCount','CommentsTotalScore', 'DisplayName', 'Reputation' , 'Location')
+
+}
+compare(sqlFiltered(Comments, Posts), dplyrFiltered(Comments, Posts), allowAll = T)
+
+```
+
+ - Query explanation:
+ 
+By using the `filter function` to subset the `PostTypeId = 1` from "Posts csv file". After that I used the `summarized function` and some function to get the "sum of the Score column" from the Comments file as, `CommentsTotalScore` and after that I did the `inner join` of the "Id with "PostId".
+
+Then after selecting the required columns, I again did the `inner join` and after that using the `arrange function`, I arranged the data of `CommentTotalScore as decreasing`. Then using the `slice function`, I limited it to 10 ,then selected the required columns for output.
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Comments, Posts,Users) {
+  sql <- sqldf("SELECT Title, CommentCount, ViewCount, CommentsTotalScore, DisplayName, Reputation, Location FROM (
+SELECT Posts.OwnerUserId, Posts.Title, Posts.CommentCount, Posts.ViewCount, CmtTotScr.CommentsTotalScore
+FROM (
+SELECT PostId, SUM(Score) AS CommentsTotalScore FROM Comments
+GROUP BY PostId
+) AS CmtTotScr
+JOIN Posts ON Posts.Id = CmtTotScr.PostId WHERE Posts.PostTypeId=1
+) AS PostsBestComments
+JOIN Users ON PostsBestComments.OwnerUserId = Users.Id ORDER BY CommentsTotalScore DESC
+LIMIT 10")
+}
+
+
+dplyrFiltered <- function(Comments, Posts,Users) {
+ po <- Posts %>%
+  filter(., PostTypeId == 1)
+
+CmtToScr  = Comments %>%
+  group_by(PostId) %>%
+  summarise(CommentsTotalScore = sum(Score),
+            .groups = 'drop') %>%
+  inner_join(., po, by=c("PostId"="Id")) 
+
+PostsBestComments = as.data.frame(CmtToScr)
+head(PostsBestComments )
+result <- PostsBestComments[ , c('CommentsTotalScore', 'OwnerUserId','Title','CommentCount','ViewCount') ] %>%
+  inner_join(., Users, by=c("OwnerUserId"="Id")) %>%
+  arrange(., desc(CommentsTotalScore)) %>%
+  slice(1:10) %>%
+  select(., 'Title', 'CommentCount', 'ViewCount','CommentsTotalScore', 'DisplayName', 'Reputation' , 'Location')
+
+}
+compare(sqlFiltered(Comments, Posts,Users), dplyrFiltered(Comments, Posts,Users), allowAll = T)
+
+```
+
+**data.table:**
+```
+datatableFiltered <- function(Comments, Posts,Users) {
+ 
+com <- data.table(Comments)
+pos <- data.table(Posts)
+use <- data.table(Users)
+
+CmtToScr<- com[ , .(CommentsTotalScore= sum(Score)), by = PostId]
+CmtToScr<- CmtToScr[order(PostId)]
+PostsBestComments <- pos[CmtToScr, on=c('Id' = 'PostId'), nomatch=NULL]
+PostsBestComments <- PostsBestComments[PostTypeId == 1]
+a <- PostsBestComments[, c('OwnerUserId','Title','CommentCount','ViewCount','CommentsTotalScore') ] 
+result <- PostsBestComments[use, on=c('OwnerUserId' = 'Id'), nomatch=NULL]
+result <- result[order(-CommentsTotalScore)]
+result <- result[1:10]
+result <- result[, c('Title', 'CommentCount', 'ViewCount','CommentsTotalScore', 'DisplayName', 'Reputation' , 'Location')]
+
+}
+compare(sqlFiltered(Comments, Posts,Users), datatableFiltered(Comments, Posts,Users), allowAll = T)
+
+```
+
+ - Query explanation:
+ 
+ Using the `sum function` I got the sum of "Score column" and renamed it as `CommentTotalScore` from the "Comments csv file". After that, I ordered it by PostId using the `order function` and the `inner joined` it. 
+ 
+After that I did the filter of PostTypeId = 1, and then selected the required columns. After that I again did the inner join then I ordered the data of `CmmentTotalScore` as decreasing, using the `order function`.
+
+Then I just limited the rows till 10, and selected the required output.
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Comments, Posts,Users) {
+  sql <- sqldf("SELECT Title, CommentCount, ViewCount, CommentsTotalScore, DisplayName, Reputation, Location FROM (
+SELECT Posts.OwnerUserId, Posts.Title, Posts.CommentCount, Posts.ViewCount, CmtTotScr.CommentsTotalScore
+FROM (
+SELECT PostId, SUM(Score) AS CommentsTotalScore FROM Comments
+GROUP BY PostId
+) AS CmtTotScr
+JOIN Posts ON Posts.Id = CmtTotScr.PostId WHERE Posts.PostTypeId=1
+) AS PostsBestComments
+JOIN Users ON PostsBestComments.OwnerUserId = Users.Id ORDER BY CommentsTotalScore DESC
+LIMIT 10")
+}
+
+datatableFiltered <- function(Comments, Posts,Users) {
+ 
+ com <- data.table(Comments)
+pos <- data.table(Posts)
+use <- data.table(Users)
+
+CmtToScr<- com[ , .(CommentsTotalScore= sum(Score)), by = PostId]
+CmtToScr<- CmtToScr[order(PostId)]
+PostsBestComments <- pos[CmtToScr, on=c('Id' = 'PostId'), nomatch=NULL]
+PostsBestComments <- PostsBestComments[PostTypeId == 1]
+a <- PostsBestComments[, c('OwnerUserId','Title','CommentCount','ViewCount','CommentsTotalScore') ] 
+result <- PostsBestComments[use, on=c('OwnerUserId' = 'Id'), nomatch=NULL]
+result <- result[order(-CommentsTotalScore)]
+result <- result[1:10]
+result <- result[, c('Title', 'CommentCount', 'ViewCount','CommentsTotalScore', 'DisplayName', 'Reputation' , 'Location')]
+
+}
+compare(sqlFiltered(Comments, Posts,Users), datatableFiltered(Comments, Posts,Users), allowAll = T)
+
+```
+
+Running `microbenchmark` yields:
+
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=sqlFiltered(Comments,Posts,Users),
+  base=baseFiltered(Comments,Posts,Users),
+  dplyr=dplyrFiltered(Comments,Posts,Users),
+  data.table=datatableFiltered(Comments,Posts,Users),
+  times = 5
+)
+```
+From the output of `microbenchmark` we can see that data.table is the fastest.
+
+## Fifth query
+
+**SQL query:**
+
+```
+sqlFiltered <- function(Posts,Votes) 
+{
+  sql <- sqldf("SELECT Posts.Title, STRFTIME('%Y-%m-%d', Posts.CreationDate) AS Date, VotesByAge.* FROM Posts
+JOIN (
+SELECT PostId,
+MAX(CASE WHEN VoteDate = 'before' THEN Total ELSE 0 END) BeforeCOVIDVotes, MAX(CASE WHEN VoteDate = 'during' THEN Total ELSE 0 END) DuringCOVIDVotes, MAX(CASE WHEN VoteDate = 'after' THEN Total ELSE 0 END) AfterCOVIDVotes, SUM(Total) AS Votes
+FROM (
+SELECT PostId,
+CASE STRFTIME('%Y', CreationDate) WHEN '2022' THEN 'after'
+WHEN '2021' THEN 'during' WHEN '2020' THEN 'during' WHEN '2019' THEN 'during' ELSE 'before'
+END VoteDate, COUNT(*) AS Total FROM Votes
+WHERE VoteTypeId IN (3, 4, 12) GROUP BY PostId, VoteDate
+) AS VotesDates
+GROUP BY VotesDates.PostId
+) AS VotesByAge ON Posts.Id = VotesByAge.PostId WHERE Title NOT IN ('') AND DuringCOVIDVotes > 0 ORDER BY DuringCOVIDVotes DESC, Votes DESC
+LIMIT 20")
+
+}
+
+```
+
+
+
+**Base functions:**
+```
+baseFiltered <- function(Posts,Votes) {
+VotesDates <- Votes[Votes$VoteTypeId==3 |Votes$VoteTypeId==4 | Votes$VoteTypeId==12,]
+VotesDates$CreationDate <- strftime(VotesDates$CreationDate, format="%Y")
+VotesDates <- aggregate(VotesDates['PostId'], by = VotesDates[c('PostId', 'CreationDate')], length)
+VotesDates$VoteDate<- ifelse('CreationDate' == 2022, 
+                              ifelse('CreationDate' == 2021,
+                                     ifelse('CreationDate' == 2020,
+                                            ifelse('CreationDate' == 2019,
+                                                   "after","during","during","during"))),"before")
+VotesDates <- VotesDates[, c("PostId", "PostId", "VoteDate")]
+colnames(VotesDates) <- c('PostId',"Total","VoteDate")
+VotesByAge <- VotesDates
+VotesByAge$BeforeCOVIDVotes <- ifelse(VotesByAge$VoteDate == 'before', VotesByAge$Total, 0L)
+VotesByAge$DuringCOVIDVotes <- ifelse(VotesByAge$VoteDate == 'during', VotesByAge$Total, 0L)
+VotesByAge$AfterCOVIDVotes <- ifelse(VotesByAge$VoteDate == 'after', VotesByAge$Total, 0L)
+VotesByAge <- aggregate(VotesByAge[c('Total')],by = VotesByAge[c('PostId','BeforeCOVIDVotes' ,'DuringCOVIDVotes' ,'AfterCOVIDVotes')], sum)
+colnames(VotesByAge)[5] <- c('Votes')
+Posts$CreationDate <- strftime(Posts$CreationDate, format='%Y-%m-%d')
+res <- merge(x=VotesByAge, y=Posts, by.x = 'PostId', by.y = 'Id',all.x = F, all.y = F)
+res <- res[(res$Title!= '') | res$BeforeCOVIDVotes > 0 , c('Title','CreationDate','PostId','BeforeCOVIDVotes','DuringCOVIDVotes','AfterCOVIDVotes','Votes')]
+colnames(res)[2] <- c('Date')
+res<-  head(res[order(res$DuringCOVIDVotes  | res$Votes ,decreasing = c(TRUE)), ],20)
+res
+}
+compare(sqlFiltered(Posts,Votes), baseFiltered(Posts,Votes), allowAll = T)
+
+```
+
+ - Query explanation:
+ 
+Firstly I got the required filter for column `VoteTypeId`, afterwards got the desired date format for column `CreationDate`. Using `aggregate` I did the grouping and `used ifelese` function for  both `WHEN THEN` parts. 
+Using `aggregate` function I found the sum of column `Total` as `Votes`, afterwards got the desired date format for column `CreationDate` for `Posts` csv file.
+Did the filtering for `Title and BeforeCOVIDVotes` as asked.
+Finished the `ordering and limiting part`selected the required column for output.
+ 
+
+
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Posts,Votes) 
+{
+  sql <- sqldf("SELECT Posts.Title, STRFTIME('%Y-%m-%d', Posts.CreationDate) AS Date, VotesByAge.* FROM Posts
+JOIN (
+SELECT PostId,
+MAX(CASE WHEN VoteDate = 'before' THEN Total ELSE 0 END) BeforeCOVIDVotes, MAX(CASE WHEN VoteDate = 'during' THEN Total ELSE 0 END) DuringCOVIDVotes, MAX(CASE WHEN VoteDate = 'after' THEN Total ELSE 0 END) AfterCOVIDVotes, SUM(Total) AS Votes
+FROM (
+SELECT PostId,
+CASE STRFTIME('%Y', CreationDate) WHEN '2022' THEN 'after'
+WHEN '2021' THEN 'during' WHEN '2020' THEN 'during' WHEN '2019' THEN 'during' ELSE 'before'
+END VoteDate, COUNT(*) AS Total FROM Votes
+WHERE VoteTypeId IN (3, 4, 12) GROUP BY PostId, VoteDate
+) AS VotesDates
+GROUP BY VotesDates.PostId
+) AS VotesByAge ON Posts.Id = VotesByAge.PostId WHERE Title NOT IN ('') AND DuringCOVIDVotes > 0 ORDER BY DuringCOVIDVotes DESC, Votes DESC
+LIMIT 20")
+
+}
+
+ baseFiltered <- function(Posts,Votes) {
+VotesDates <- Votes[Votes$VoteTypeId==3 |Votes$VoteTypeId==4 | Votes$VoteTypeId==12,]
+VotesDates$CreationDate <- strftime(VotesDates$CreationDate, format="%Y")
+VotesDates <- aggregate(VotesDates['PostId'], by = VotesDates[c('PostId', 'CreationDate')], length)
+VotesDates$VoteDate<- ifelse('CreationDate' == 2022, 
+                              ifelse('CreationDate' == 2021,
+                                     ifelse('CreationDate' == 2020,
+                                            ifelse('CreationDate' == 2019,
+                                                   "after","during","during","during"))),"before")
+VotesDates <- VotesDates[, c("PostId", "PostId", "VoteDate")]
+colnames(VotesDates) <- c('PostId',"Total","VoteDate")
+VotesByAge <- VotesDates
+VotesByAge$BeforeCOVIDVotes <- ifelse(VotesByAge$VoteDate == 'before', VotesByAge$Total, 0L)
+VotesByAge$DuringCOVIDVotes <- ifelse(VotesByAge$VoteDate == 'during', VotesByAge$Total, 0L)
+VotesByAge$AfterCOVIDVotes <- ifelse(VotesByAge$VoteDate == 'after', VotesByAge$Total, 0L)
+VotesByAge <- aggregate(VotesByAge[c('Total')],by = VotesByAge[c('PostId','BeforeCOVIDVotes' ,'DuringCOVIDVotes' ,'AfterCOVIDVotes')], sum)
+colnames(VotesByAge)[5] <- c('Votes')
+Posts$CreationDate <- strftime(Posts$CreationDate, format='%Y-%m-%d')
+res <- merge(x=VotesByAge, y=Posts, by.x = 'PostId', by.y = 'Id',all.x = F, all.y = F)
+res <- res[(res$Title!= '') | res$BeforeCOVIDVotes > 0 , c('Title','CreationDate','PostId','BeforeCOVIDVotes','DuringCOVIDVotes','AfterCOVIDVotes','Votes')]
+colnames(res)[2] <- c('Date')
+res<-  head(res[order(res$DuringCOVIDVotes  | res$Votes ,decreasing = c(TRUE)), ],20)
+res
+}
+compare(sqlFiltered(Posts,Votes), baseFiltered(Posts,Votes), allowAll = T)
+  
+
+
+```
+
+**dplyr:**
+```
+
+dplyrFiltered <- function(Posts,Votes) {
+ 
+ VotesDates <- Votes%>%
+  filter(VoteTypeId %in% c("3", "4","12"))%>%
+  select(., PostId,CreationDate)%>%
+  mutate(.,Year=strftime(CreationDate, format = "%Y")) %>%
+  mutate(VoteDate = case_when(Year == 2022 ~ 'after'
+                              ,Year == 2021 ~ 'during'
+                              ,Year == 2020 ~ 'during'
+                              ,Year == 2019 ~ 'during'
+                              ,TRUE ~ 'before'))%>%
+  add_count(., VoteDate, name="Total")%>%
+  group_by(PostId,VoteDate) %>% 
+  summarize(Total=n())
+
+res <- Posts %>%
+  mutate(Year = strftime(CreationDate, format = '%Y-%m-%d'))
+
+VotesByAge <- VotesDates %>% mutate(
+  BeforeCOVIDVotes = case_when(VoteDate == 'before' ~ Total, TRUE ~ 0L),
+  DuringCOVIDVotes = case_when(VoteDate == 'during' ~ Total, TRUE ~ 0L),
+  AfterCOVIDVotes = case_when(VoteDate == 'after' ~ Total, TRUE ~ 0L)
+) %>%
+  add_count(., Total, name="Votes") %>%
+  group_by(PostId)  %>%
+  inner_join(.,res, by=c("PostId"="Id")) %>%
+  filter(Title != ''| BeforeCOVIDVotes > 0) %>%
+  select(., 'Title','CreationDate','PostId','BeforeCOVIDVotes','DuringCOVIDVotes','AfterCOVIDVotes','Votes') %>%
+  rename(., 'Date'='CreationDate')%>%
+  arrange(., desc(BeforeCOVIDVotes) | desc(Votes))
+as.data.frame(VotesByAge[1:20,]) 
+
+}
+compare(sqlFiltered(Posts,Votes), dplyrFiltered(Posts,Votes), allowAll = T)
+
+```
+
+ - Query explanation:
+ 
+Firstly I got the required filter for column `VoteTypeId`, afterwards got the desired date format for column `CreationDate`. Using `aggregate` I did the grouping and `used ifelese` function for  both `WHEN THEN` parts. 
+Using `aggregate` function I found the sum of column `Total` as `Votes`, afterwards got the desired date format for column `CreationDate` for `Posts` csv file.
+Did the filtering for `Title and BeforeCOVIDVotes` as asked.
+Finished the `ordering and limiting part`selected the required column for output.
+ 
+
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Posts,Votes) 
+{
+  sql <- sqldf("SELECT Posts.Title, STRFTIME('%Y-%m-%d', Posts.CreationDate) AS Date, VotesByAge.* FROM Posts
+JOIN (
+SELECT PostId,
+MAX(CASE WHEN VoteDate = 'before' THEN Total ELSE 0 END) BeforeCOVIDVotes, MAX(CASE WHEN VoteDate = 'during' THEN Total ELSE 0 END) DuringCOVIDVotes, MAX(CASE WHEN VoteDate = 'after' THEN Total ELSE 0 END) AfterCOVIDVotes, SUM(Total) AS Votes
+FROM (
+SELECT PostId,
+CASE STRFTIME('%Y', CreationDate) WHEN '2022' THEN 'after'
+WHEN '2021' THEN 'during' WHEN '2020' THEN 'during' WHEN '2019' THEN 'during' ELSE 'before'
+END VoteDate, COUNT(*) AS Total FROM Votes
+WHERE VoteTypeId IN (3, 4, 12) GROUP BY PostId, VoteDate
+) AS VotesDates
+GROUP BY VotesDates.PostId
+) AS VotesByAge ON Posts.Id = VotesByAge.PostId WHERE Title NOT IN ('') AND DuringCOVIDVotes > 0 ORDER BY DuringCOVIDVotes DESC, Votes DESC
+LIMIT 20")
+
+}
+
+
+dplyrFiltered <- function(Posts,Votes) {
+ 
+  
+VotesDates <- Votes%>%
+  filter(VoteTypeId %in% c("3", "4","12"))%>%
+  select(., PostId,CreationDate)%>%
+  mutate(.,Year=strftime(CreationDate, format = "%Y")) %>%
+  mutate(VoteDate = case_when(Year == 2022 ~ 'after'
+                              ,Year == 2021 ~ 'during'
+                              ,Year == 2020 ~ 'during'
+                              ,Year == 2019 ~ 'during'
+                              ,TRUE ~ 'before'))%>%
+  add_count(., VoteDate, name="Total")%>%
+  group_by(PostId,VoteDate) %>% 
+  summarize(Total=n())
+
+res <- Posts %>%
+  mutate(Year = strftime(CreationDate, format = '%Y-%m-%d'))
+
+VotesByAge <- VotesDates %>% mutate(
+  BeforeCOVIDVotes = case_when(VoteDate == 'before' ~ Total, TRUE ~ 0L),
+  DuringCOVIDVotes = case_when(VoteDate == 'during' ~ Total, TRUE ~ 0L),
+  AfterCOVIDVotes = case_when(VoteDate == 'after' ~ Total, TRUE ~ 0L)
+) %>%
+  add_count(., Total, name="Votes") %>%
+  group_by(PostId)  %>%
+  inner_join(.,res, by=c("PostId"="Id")) %>%
+  filter(Title != ''| BeforeCOVIDVotes > 0) %>%
+  select(., 'Title','CreationDate','PostId','BeforeCOVIDVotes','DuringCOVIDVotes','AfterCOVIDVotes','Votes') %>%
+  rename(., 'Date'='CreationDate')%>%
+  arrange(., desc(BeforeCOVIDVotes) | desc(Votes))
+as.data.frame(VotesByAge[1:20,]) 
+  
+}
+compare(sqlFiltered(Posts,Votes), dplyrFiltered(Posts,Votes), allowAll = T)
+
+```
+
+**data.table:**
+```
+datatableFiltered <- function(Posts,Votes) {
+ 
+Y<- data.table(Votes)
+Y  <- Y[, Year := strftime(Votes$CreationDate, format = "%Y")] 
+Y <- Y[VoteTypeId == 4 | VoteTypeId == 4 |VoteTypeId == 12 ]
+Y[, VoteDate := ifelse( Year== 2022,
+                        ifelse( Year== 2021,
+                                ifelse( Year== 2020,
+                                        ifelse( Year== 2019,
+                                                'after','during'),'during'),'during'),'before')]
+VotesDates=Y[,.(Total=(count=.N)),by=c("VoteDate","PostId")]                     
+VotesByAge <- as.data.table(VotesDates)
+VotesByAge[, BeforeCOVIDVotes := ifelse(VoteDate == 'before', Total, 0L)]
+VotesByAge[, DuringCOVIDVotes := ifelse(VoteDate == 'during', Total, 0L)]
+VotesByAge[, AfterCOVIDVotes := ifelse(VoteDate == 'after', Total, 0L)]
+VotesByAge =VotesByAge[,.(Votes=(count=.N)),by=c('PostId','BeforeCOVIDVotes' ,'DuringCOVIDVotes' ,'AfterCOVIDVotes')]
+dat <- as.data.table(Posts)
+pos <- dat[, CreationDate := strftime(CreationDate, format = '%Y-%m-%d')] 
+res <- VotesByAge[dat, on=c('PostId' = 'Id'), nomatch=NULL]
+res <- res[res$Title != '' | res$BeforeCOVIDVotes > 0 , c('Title','CreationDate','PostId','BeforeCOVIDVotes','DuringCOVIDVotes','AfterCOVIDVotes','Votes')] 
+colnames(res)[2] <- c('Date')
+res <- res[order(-BeforeCOVIDVotes) | order(-Votes)]
+res <- res[1:20]
+
+}
+compare(sqlFiltered(Posts,Votes), datatableFiltered(Posts,Votes), allowAll = T)
+
+```
+
+ - Query explanation:
+
+ 
+Firstly I got the required filter for column `VoteTypeId`, afterwards got the desired date format for column `CreationDate`. Using `aggregate` I did the grouping and `used ifelese` function for  both `WHEN THEN` parts. 
+Using `aggregate` function I found the sum of column `Total` as `Votes`, afterwards got the desired date format for column `CreationDate` for `Posts` csv file.
+Did the filtering for `Title and BeforeCOVIDVotes` as asked.
+Finished the `ordering and limiting part`selected the required column for output.
+ 
+
+
+Running `compare` function yields:
+```{r}
+
+sqlFiltered <- function(Posts,Votes) 
+{
+  sql <- sqldf("SELECT Posts.Title, STRFTIME('%Y-%m-%d', Posts.CreationDate) AS Date, VotesByAge.* FROM Posts
+JOIN (
+SELECT PostId,
+MAX(CASE WHEN VoteDate = 'before' THEN Total ELSE 0 END) BeforeCOVIDVotes, MAX(CASE WHEN VoteDate = 'during' THEN Total ELSE 0 END) DuringCOVIDVotes, MAX(CASE WHEN VoteDate = 'after' THEN Total ELSE 0 END) AfterCOVIDVotes, SUM(Total) AS Votes
+FROM (
+SELECT PostId,
+CASE STRFTIME('%Y', CreationDate) WHEN '2022' THEN 'after'
+WHEN '2021' THEN 'during' WHEN '2020' THEN 'during' WHEN '2019' THEN 'during' ELSE 'before'
+END VoteDate, COUNT(*) AS Total FROM Votes
+WHERE VoteTypeId IN (3, 4, 12) GROUP BY PostId, VoteDate
+) AS VotesDates
+GROUP BY VotesDates.PostId
+) AS VotesByAge ON Posts.Id = VotesByAge.PostId WHERE Title NOT IN ('') AND DuringCOVIDVotes > 0 ORDER BY DuringCOVIDVotes DESC, Votes DESC
+LIMIT 20")
+
+}
+
+
+datatableFiltered <- function(Posts,Votes) {
+ 
+Y<- data.table(Votes)
+Y  <- Y[, Year := strftime(Votes$CreationDate, format = "%Y")] 
+Y <- Y[VoteTypeId == 4 | VoteTypeId == 4 |VoteTypeId == 12 ]
+Y[, VoteDate := ifelse( Year== 2022,
+                        ifelse( Year== 2021,
+                                ifelse( Year== 2020,
+                                        ifelse( Year== 2019,
+                                                'after','during'),'during'),'during'),'before')]
+VotesDates=Y[,.(Total=(count=.N)),by=c("VoteDate","PostId")]                     
+VotesByAge <- as.data.table(VotesDates)
+VotesByAge[, BeforeCOVIDVotes := ifelse(VoteDate == 'before', Total, 0L)]
+VotesByAge[, DuringCOVIDVotes := ifelse(VoteDate == 'during', Total, 0L)]
+VotesByAge[, AfterCOVIDVotes := ifelse(VoteDate == 'after', Total, 0L)]
+VotesByAge =VotesByAge[,.(Votes=(count=.N)),by=c('PostId','BeforeCOVIDVotes' ,'DuringCOVIDVotes' ,'AfterCOVIDVotes')]
+dat <- as.data.table(Posts)
+pos <- dat[, CreationDate := strftime(CreationDate, format = '%Y-%m-%d')] 
+res <- VotesByAge[dat, on=c('PostId' = 'Id'), nomatch=NULL]
+res <- res[res$Title != '' | res$BeforeCOVIDVotes > 0 , c('Title','CreationDate','PostId','BeforeCOVIDVotes','DuringCOVIDVotes','AfterCOVIDVotes','Votes')] 
+colnames(res)[2] <- c('Date')
+res <- res[order(-BeforeCOVIDVotes) | order(-Votes)]
+res <- res[1:20]
+
+}
+compare(sqlFiltered(Posts,Votes), datatableFiltered(Posts,Votes), allowAll = T)
+
+```
+
+Running `microbenchmark` yields:
+From the output of `microbenchmark` we can see that data.table is the fastest.
+
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=sqlFiltered(Posts,Votes),
+  base=baseFiltered(Posts,Votes),
+  dplyr=dplyrFiltered(Posts,Votes),
+  data.table=datatableFiltered(Posts,Votes),
+  times = 5
+)
+```
