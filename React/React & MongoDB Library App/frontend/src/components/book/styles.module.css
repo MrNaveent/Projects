@@ -1,0 +1,29 @@
+.wrapper {
+    margin: 2em auto 0;
+    padding: 1em;
+    max-width: 600px;
+}
+
+.btnContainer {
+    display: flex;
+    justify-content: space-between;
+    flex: auto;
+    gap: 10px;
+}
+
+.btnContainer>* {
+    margin: 10px;
+}
+
+body {
+    background-image: url("https://assets.weforum.org/article/image/responsive_big_webp_hySrQhk9QgN45B-0z8PR0bd8ZRyDZ9LnvzPSGaIb91Q.webp");
+    opacity: 1.0;
+    
+   }
+
+
+  
+  div {
+    
+    color: rgb(38, 241, 15);
+  }   

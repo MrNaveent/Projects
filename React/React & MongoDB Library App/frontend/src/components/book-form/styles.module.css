@@ -1,0 +1,26 @@
+.wrapper {
+    max-width: 600;
+    margin: 25px auto 0;
+    padding: 2em;
+}
+
+.mb2 {
+    margin-bottom: 2em !important;
+}
+
+.btnContainer {
+    display: flex;
+    justify-content: flex-end;
+    margin-right: 10px;
+    gap: 10px;
+}
+
+.pageHeader {
+    border-bottom: 1px solid #10ec31;
+    padding-bottom: 1em;
+    margin-bottom: 1.5em;
+}
+body {
+    background-image: url("https://assets.weforum.org/article/image/responsive_big_webp_hySrQhk9QgN45B-0z8PR0bd8ZRyDZ9LnvzPSGaIb91Q.webp");
+    
+   }
