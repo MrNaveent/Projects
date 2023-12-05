@@ -1,0 +1,6 @@
+/* css/editor-styles.css */
+#qt_custom_summary {
+    /* Add any custom styles for the button here */
+    background-color: red; /* Example: Change background color */
+    pointer-events: none; /* Example: Disable pointer events for the button */
+}
