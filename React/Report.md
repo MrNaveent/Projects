@@ -1,6 +1,6 @@
 ## Introduction
 
-The following folders contains the code for an online `library` which have been implemented in three different ways.
+The following folders contains the code for an online `library`, `Snake Game`,and some small codes for learning purposes.
 For the library in `React` the front has been designed using `Material UI` and the backend have been supported trough `MongoDB`.
 For `Qt Creator and MVC` the data storing has been supported trough `JSON files`.
 
