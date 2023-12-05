@@ -1,0 +1,16 @@
+{
+  "user": [
+    {
+      "id": 1,
+      "EMAIL": "g.ganci@glauco.it",
+      "NOME": "GIULIO",
+      "COGNOME": "GANCI",
+      "CELLULARE": "1234567890",
+      "DT_LEAD": "2023/09/10",
+      "CONSENSO_PRIVACY": "YES",
+      "CONSENSO_MARKETING": "YES",
+      "__cls1": 1
+    }
+  ]
+}
+
