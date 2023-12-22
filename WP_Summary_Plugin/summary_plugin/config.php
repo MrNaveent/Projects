@@ -2,5 +2,5 @@
 
 // config.php
 
-define('OPENAI_API_KEY', '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');
+define('OPENAI_API_KEY', 'api-key');
 ?>
