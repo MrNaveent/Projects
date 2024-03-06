@@ -6,7 +6,7 @@
 - Basic E-commerce Features- Product lists, Product Details, Cart, Checkout 
 - Secure Card Payments / Cash payments
 - Admin Panel - Add/Edit Orders. Add/Edit Products
-- To enter the website as Admin, login using email:`admin@admin.com`, password:`AdminAdmin1`
+- To enter the website as Admin, login using email:`admin@admin.com`, password:`AdminAdmin1`. After this please visit user profile to confirm that you have entered as admin.
 - Sorting, Filtering, and Pagination queries using Mongoose
 - Authentication with Passport JS strategies
 - Order Emails, Reset Password Emails
