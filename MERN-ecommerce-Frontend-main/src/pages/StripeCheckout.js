@@ -7,7 +7,7 @@ import CheckoutForm from "./CheckoutForm";
 import "../Stripe.css";
 import { selectCurrentOrder } from "../features/order/orderSlice";
 // stripe publishable api key
-const stripePromise = loadStripe("pk_test_51OqYPEKHy68HohQdcYj9hAn0bMtgKdAYfGIN2d3EZJuZ68gp4SgYsKhjstqjACiHXQ1E9v8o1vJleseLo95W59GT003qZtUplK");
+const stripePromise = loadStripe("");
 
 export default function StripeCheckout() {
   const [clientSecret, setClientSecret] = useState("");
