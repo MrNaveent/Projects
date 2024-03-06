@@ -26,6 +26,7 @@
 - Please download both backend and frontend repositories from github.com.
 - Go to the MERN-ecommerce-backend-main directory in terminal and run `npm install --force` command to download the required packages.
 - We need to use the `--force` command as some of the packages used in the project are not compatible with the latest version of MERN.
-- For simplicity I have also uploaded the `.env` file with the project, which contains all the important configurations, such as Port, MongoDB connection, Stripe Secret key, etc.
+- For simplicity I have also uploaded the `.env` file with the project, which contains all the important configurations, such as Port, MongoDB connection, etc.
+- Please add your `stripe server key(stripe secret key)` in `.env` file and `stripe publishable key` in line number 10 of `stripeCheckout.js` file which is in `Frontend directory`(MERN-ecommerce-Frontend-main/src/pages/StripeCheckout.js). 
 - Please use my DB url as it contains the data of `products`, `brands` and `categories`, which i fetched using another API.
 - Now in terminal run `npm run dev` command, If you can see `server started and databse connected` in terminal. It means everything is working fine, now we can switch to frontend. 
