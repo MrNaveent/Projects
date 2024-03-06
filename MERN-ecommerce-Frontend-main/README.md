@@ -32,6 +32,7 @@
 - Please download both backend and frontend repositories from github.com.
 - Go to the MERN-ecommerce-Frontend-main directory in terminal and run `npm install --force` command to download the required packages.
 - We need to use the `--force` command as some of the packages such as `spinner`,`alert`, used in the project are not compatible with the latest version of MERN.
+- - Please add your `stripe server key(stripe secret key)` in `.env` file in the backend directory and `stripe publishable key` in line number 10 of `stripeCheckout.js` file which is in `Frontend directory`(MERN-ecommerce-Frontend-main/src/pages/StripeCheckout.js).
 - Now in terminal run `npm run start` command, If you can see `webpack compiled` in terminal. It means everything is working fine.
 - Switch to any browser, the paste the url `http://localhost:3000`, this will redirect to the `ecommerce` website.
 
