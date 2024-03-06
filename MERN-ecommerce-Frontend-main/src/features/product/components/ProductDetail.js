@@ -155,7 +155,7 @@ export default function ProductDetail() {
                 ${product.price}
               </p>
               <p className="text-3xl tracking-tight text-gray-900">
-                ${product.discountprice}
+                 ${product.discountPrice}
               </p>
 
               {/* Reviews */}
