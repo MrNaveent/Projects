@@ -3,7 +3,7 @@
 
 
 🔥 Features :
-- Basic E-commerce Features- Product lists, Product Details, Cart, Checkout 
+- Basic E-commerce Features- Product lists, Product Details, Cart, Checkout, Pagination, Filtering, Sorting, Reset Password, Order Confirmation email with Receipt.
 - Secure Card Payments / Cash payments
 - Admin Panel - Add/Edit Orders. Add/Edit Products
 - To enter the website as Admin, login using email:`admin@admin.com`, password:`AdminAdmin1`. After this please visit user profile to confirm that you have entered as admin.
